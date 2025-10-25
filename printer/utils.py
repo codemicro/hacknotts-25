@@ -26,7 +26,7 @@ def setup_logging(*, verbosity: Literal[0, 1, 2, 3] = 1) -> None:
     if verbosity < 1:
         return
 
-    VERBOSITY_STRING: Final[str] = "DEBUG" if verbosity == 1 else "INFO"
+    VERBOSITY_STRING: Final[str] = "DEBUG" if verbosity > 1 else "INFO"
 
     console_logging_handler: logging.StreamHandler[TextIO] = logging.StreamHandler()
     console_logging_handler.setFormatter(

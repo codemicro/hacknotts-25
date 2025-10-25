@@ -4,6 +4,7 @@ import base64
 import logging
 import select
 import shutil
+import subprocess
 import sys
 import time
 from typing import TYPE_CHECKING
@@ -39,13 +40,24 @@ def _print_stdin(lp_executable: str) -> None:
         text=base64.standard_b64encode(sys.stdin.buffer.read(1800 * 64)).decode(),
         wrapmode=WrapMode.CHAR,
     )
-    # subprocess.run((lp_executable,), check=True, input=pdf.output())
-    pdf.output("test.pdf")
+
+    completed_print_subprocess_stdout: str = subprocess.run(
+        (lp_executable,),
+        check=True,
+        input=pdf.output(),
+        stdout=subprocess.PIPE,
+        text=False,
+        timeout=None,
+    ).stdout.decode()
+    if completed_print_subprocess_stdout:
+        logger.debug(
+            "Subprocess call to 'lp' had stdout: %s", repr(completed_print_subprocess_stdout)
+        )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """"""
-    utils.setup_logging()  # TODO: Make verbosity configurable
+    utils.setup_logging(verbosity=2)  # TODO: Make verbosity configurable
 
     if argv is None:
         argv = sys.argv[1:]
