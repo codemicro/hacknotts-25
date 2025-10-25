@@ -59,22 +59,6 @@ int tun_alloc(char *dev, int flags) {
     return fd;
 }
 
-int write_all(int fd, const char *buf, int nbytes) {
-    int n_bytes_written = 0;
-    int res;
-
-    while (n_bytes_written < nbytes) {
-        printf("write: %d bytes, %d written\n", nbytes - n_bytes_written, n_bytes_written);
-        res = write(fd, &buf[n_bytes_written], nbytes - n_bytes_written);
-        if (res < 1) {
-            return res;
-        }
-        n_bytes_written += res;
-    }
-
-    return n_bytes_written;
-}
-
 void size_to_big_endian_bytes(u_int8_t *buf, ssize_t n) {
     buf[0] = (n & 0xff0000) >> 16;
     buf[1] = (n & 0x00ff00) >> 8;
@@ -83,20 +67,20 @@ void size_to_big_endian_bytes(u_int8_t *buf, ssize_t n) {
 
 #define TUN_MTU 1500
 
-int tun_readloop(int tun_fd, int downstream_fd) {
+int tun_readloop(int tun_fd, int downstream_fd, int ipc_input_fd) {
     ssize_t n_bytes_read, n_bytes_written;
     char buf[TUN_MTU];
     u_int8_t len_notify[3];
     struct pollfd poll_fds[2];
 
 #define IDX_TUN 0
-#define IDX_DOWNSTREAM 1
+#define IDX_IPC_IN 1
 
     poll_fds[IDX_TUN].fd = tun_fd;
     poll_fds[IDX_TUN].events = POLLIN | POLLERR | POLLHUP;
 
-    poll_fds[IDX_DOWNSTREAM].fd = downstream_fd;
-    poll_fds[IDX_DOWNSTREAM].events = POLLIN | POLLERR | POLLHUP;
+    poll_fds[IDX_IPC_IN].fd = ipc_input_fd;
+    poll_fds[IDX_IPC_IN].events = POLLIN | POLLERR | POLLHUP;
 
     // TODO: implement handling for POLLERR and POLLHUP
     int ready;
@@ -117,30 +101,26 @@ int tun_readloop(int tun_fd, int downstream_fd) {
 
             if (n_bytes_read > 0) {
                 size_to_big_endian_bytes(len_notify, n_bytes_read);
-                if ((n_bytes_written = write(poll_fds[IDX_DOWNSTREAM].fd, len_notify, 3)) < 0) {
+                if ((n_bytes_written = write(downstream_fd, len_notify, 3)) < 0) {
                     perror("write to downstream");
                     return n_bytes_written;
                 }
 
-                if ((n_bytes_written = write(poll_fds[IDX_DOWNSTREAM].fd, buf, n_bytes_read)) < 0) {
+                if ((n_bytes_written = write(downstream_fd, buf, n_bytes_read)) < 0) {
                     perror("write to downstream");
                     return n_bytes_written;
                 }
-//            if ((err = write_all(poll_fds[IDX_DOWNSTREAM].fd, buf, n_bytes_read)) < 0) {
-//                perror("write to downstream");
-//                return err;
-//            }
                 printf("downstream: wrote %zd bytes\n", n_bytes_written);
             }
         }
 
-        if (poll_fds[IDX_DOWNSTREAM].revents & POLLIN) {
-            n_bytes_read = read(poll_fds[IDX_DOWNSTREAM].fd, buf, sizeof(buf));
+        if (poll_fds[IDX_IPC_IN].revents & POLLIN) {
+            n_bytes_read = read(poll_fds[IDX_IPC_IN].fd, buf, sizeof(buf));
             if (n_bytes_read < 0) {
-                perror("read from downstream");
+                perror("read from IPC input");
                 return n_bytes_read;
             }
-            printf("downstream: read %zd bytes\n", n_bytes_read);
+            printf("IPC input: read %zd bytes\n", n_bytes_read);
 
             if (n_bytes_read > 0) {
                 if ((n_bytes_written = write(poll_fds[IDX_TUN].fd, buf, n_bytes_read)) < 0) {
@@ -162,7 +142,7 @@ int open_fifo(const char *name, int oflag, mode_t mode) {
     return open(name, oflag);
 }
 
-#define USAGE_STR "usage: %s [TUN device name] [child process spawn command]\n"
+#define USAGE_STR "usage: %s [-f] TUNDEV CHILDCMD\n\nTUNDEV is the TUN device to bind to\nCHILDCMD is a command that will be run as a child process and will have adapter data sent to\n\nOptions:\n  -f\tSet the file path to be used for FIFO IPC (default: %s)\n"
 
 int parse_cli_args(int argc, char **argv, char **tun_device_ptr, char **child_process_cmd_ptr, char **downstream_fifo_filepath_ptr) {
     char *input_path_ptr = "/var/run/printun";
@@ -182,18 +162,18 @@ int parse_cli_args(int argc, char **argv, char **tun_device_ptr, char **child_pr
         }
     }
 
-    if (argc < 3) {
+    if (argc - optind < 2) {
         goto help;
     }
 
-    *tun_device_ptr = argv[1];
-    *child_process_cmd_ptr = argv[2];
+    *tun_device_ptr = argv[optind];
+    *child_process_cmd_ptr = argv[optind+1];
     *downstream_fifo_filepath_ptr = input_path_ptr;
 
     return 0;
 
 help:
-    fprintf(stderr, USAGE_STR, argv[0]);
+    fprintf(stderr, USAGE_STR, argv[0], input_path_ptr);
     return -1;
 }
 
@@ -244,6 +224,16 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Open FIFO IPC
+
+    printf("fifo_ipc=%s\n", downstream_fifo_file_path);
+
+    int ipc_fd = open_fifo(downstream_fifo_file_path, O_RDONLY | O_NONBLOCK, 0777);
+    if (ipc_fd < 0) {
+        perror("open FIFO IPC");
+        return 1;
+    }
+
     // Start child process
 
     int child_stdin_fd;
@@ -277,7 +267,7 @@ int main(int argc, char** argv) {
 
     printf("entering readloop\n");
 
-    if ((err = tun_readloop(tun_fd, child_stdin_fd)) < 0) {
+    if ((err = tun_readloop(tun_fd, child_stdin_fd, ipc_fd)) < 0) {
         perror("tun_readloop()");
         return err;
     }
