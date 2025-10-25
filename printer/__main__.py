@@ -6,7 +6,7 @@ import select
 import shutil
 import subprocess
 import sys
-import time
+from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
 
 from fpdf import FPDF
@@ -27,32 +27,46 @@ logger: Final[Logger] = logging.getLogger("ipops-printer")
 
 
 def _print_stdin(lp_executable: str) -> None:
-    while not select.select([sys.stdin], [], [], 0)[0]:
+    while not select.select([sys.stdin], [], [], 0.15)[0]:  # TODO: Configure polling rate
         if GracefulTerminationHandler.EXIT_NOW:
             return
 
-        time.sleep(0.1)  # TODO: Configure polling rate
+    logger.debug("Ready to accept data from stdin")
+
+    frame_size: int = int.from_bytes(sys.stdin.buffer.read(3), byteorder="big")
+
+    logger.debug("Reading %d bytes from stdin", frame_size)
+
+    stdin_data: bytes = sys.stdin.buffer.read(frame_size)
+
+    logger.debug("Byte reading completed successfully")
 
     pdf: FPDF = FPDF(format="A4")
     pdf.add_page()
     pdf.set_font("Courier", size=12)
     pdf.write(
-        text=base64.standard_b64encode(sys.stdin.buffer.read(1800 * 64)).decode(),
+        text=base64.standard_b64encode(stdin_data).decode(),
         wrapmode=WrapMode.CHAR,
     )
+
+    pdf_bytes: bytes = pdf.output()
+
+    logger.debug("Formatting PDF completed successfully")
 
     completed_print_subprocess_stdout: str = subprocess.run(
         (lp_executable,),
         check=True,
-        input=pdf.output(),
+        input=pdf_bytes,
         stdout=subprocess.PIPE,
         text=False,
         timeout=None,
     ).stdout.decode()
     if completed_print_subprocess_stdout:
-        logger.debug(
+        logger.warning(
             "Subprocess call to 'lp' had stdout: %s", repr(completed_print_subprocess_stdout)
         )
+
+    logger.debug("Printing PDF completed successfully")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -75,15 +89,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    logger.debug("Starting listener loop")
+    logger.info("Starting listener loop")
 
     GracefulTerminationHandler.setup()
-    while not GracefulTerminationHandler.EXIT_NOW:
-        _print_stdin(lp_executable)
 
-    logger.debug("Ended listener loop")
+    try:
+        while not GracefulTerminationHandler.EXIT_NOW:
+            _print_stdin(lp_executable)
+    except CalledProcessError as e:
+        logger.error("Subrocess call to 'lp' failed with exit code %d", e.returncode)  # noqa: TRY400
+        logger.info("Subprocess call to 'lp' had stderr: %s", repr(e.stderr))
+        logger.info("Subprocess call to 'lp' had stdout: %s", repr(e.stdout))
+        return 2
 
-    logger.debug("Exiting")
+    logger.info("Ended listener loop")
+
+    logger.info("Exiting")
 
     return 0
 
