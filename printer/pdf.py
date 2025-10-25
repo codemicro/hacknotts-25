@@ -35,7 +35,7 @@ class _IPOPS_PDF(FPDF):
         self.cell(0, 10, str(self.starting_page_num + self.page_no()), align="C")
 
 
-def text_to_pdf(text: str, starting_page_num: int) -> bytearray:
+def text_to_pdf(text: str, starting_page_num: int) -> tuple[bytearray, int]:
     """"""
     pdf: FPDF = _IPOPS_PDF(format="A4", starting_page_num=starting_page_num)
 
@@ -43,4 +43,4 @@ def text_to_pdf(text: str, starting_page_num: int) -> bytearray:
     pdf.set_font("Courier", size=12)
     pdf.write(text=text, wrapmode=WrapMode.CHAR)
 
-    return pdf.output()
+    return pdf.output(), pdf.pages_count
