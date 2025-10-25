@@ -1,12 +1,12 @@
-
 ### Python ###
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 
 # C extensions
-*.so
+*.pyc
 
 # Distribution / packaging
 .Python
@@ -38,82 +38,51 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
 # Translations
 *.mo
 *.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
 
 # PyBuilder
 .pybuilder/
 target/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
 # IPython
 profile_default/
 ipython_config.py
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
+# pdm
+.pdm.toml
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+# PEP 582;
 __pypackages__/
 
-# Celery stuff
+# Cython debug symbols
+cython_debug/
+
+# Django
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Celery
 celerybeat-schedule
 celerybeat.pid
 
 # SageMath parsed files
 *.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
 
 # Spyder project settings
 .spyderproject
@@ -122,25 +91,15 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
 # Pyre type checker
 .pyre/
 
 # pytype static type analyzer
 .pytype/
 
-# Cython debug symbols
-cython_debug/
-
 
 ### C ###
+
 # Prerequisites
 *.d
 
@@ -193,3 +152,124 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+
+### Local Cache / Environment Files
+
+# Logs
+logs
+*.log
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Stack Dump Files
+*.stackdump
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Caches
+.mypy_cache
+.mypy_cache/
+.pytest_cache
+.pytest_cache/
+.ruff_cache
+.ruff_cache/
+.cache
+.cache/
+.dmypy.json
+dmypy.json
+
+# Environments
+.env
+._env
+.env.test
+.env.original
+.venv
+env
+venv
+ENV
+env.bak
+venv.bak
+[Bb]in
+[Ii]nclude
+[Ll]ib
+[Ll]ib64
+[Ll]ocal
+[Ss]cripts
+pyvenv.cfg
+pip-selfcheck.json
+.env.backup
+.env.bkp
+.env.bckp
+.env.bak
+env.test
+venv.test
+env.original
+venv.original
+env.backup
+venv.backup
+env.bkp
+venv.bkp
+env.bckp
+venv.bckp
+
+# Local Files/Databases
+local/
+*.sqlite3
+*.sqlite
+*.sqlite3-journal
+*.db
+local_stubs/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+cover/
+
+
+### Local Config & Settings
+
+# VSCode settings
+.vscode
+
+# JetBrains IDE settings
+.idea
+*.iws
+.idea_modules/
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+# Windows Directory Settings Files
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# Windows Thumbnail Cache Files
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
