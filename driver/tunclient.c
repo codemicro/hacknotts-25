@@ -75,11 +75,18 @@ int write_all(int fd, const char *buf, int nbytes) {
     return n_bytes_written;
 }
 
+void size_to_big_endian_bytes(u_int8_t *buf, ssize_t n) {
+    buf[0] = (n & 0xff0000) >> 16;
+    buf[1] = (n & 0x00ff00) >> 8;
+    buf[2] = (n & 0x0000ff);
+}
+
 #define TUN_MTU 1500
 
 int tun_readloop(int tun_fd, int downstream_fd) {
-    int n_bytes_read, n_bytes_written;
+    ssize_t n_bytes_read, n_bytes_written;
     char buf[TUN_MTU];
+    u_int8_t len_notify[3];
     struct pollfd poll_fds[2];
 
 #define IDX_TUN 0
@@ -106,9 +113,15 @@ int tun_readloop(int tun_fd, int downstream_fd) {
                 perror("read from tun");
                 return n_bytes_read;
             }
-            printf("tun: read %d bytes\n", n_bytes_read);
+            printf("tun: read %zd bytes\n", n_bytes_read);
 
             if (n_bytes_read > 0) {
+                size_to_big_endian_bytes(len_notify, n_bytes_read);
+                if ((n_bytes_written = write(poll_fds[IDX_DOWNSTREAM].fd, len_notify, 3)) < 0) {
+                    perror("write to downstream");
+                    return n_bytes_written;
+                }
+
                 if ((n_bytes_written = write(poll_fds[IDX_DOWNSTREAM].fd, buf, n_bytes_read)) < 0) {
                     perror("write to downstream");
                     return n_bytes_written;
@@ -117,7 +130,7 @@ int tun_readloop(int tun_fd, int downstream_fd) {
 //                perror("write to downstream");
 //                return err;
 //            }
-                printf("downstream: wrote %d bytes\n", n_bytes_written);
+                printf("downstream: wrote %zd bytes\n", n_bytes_written);
             }
         }
 
@@ -127,14 +140,14 @@ int tun_readloop(int tun_fd, int downstream_fd) {
                 perror("read from downstream");
                 return n_bytes_read;
             }
-            printf("downstream: read %d bytes\n", n_bytes_read);
+            printf("downstream: read %zd bytes\n", n_bytes_read);
 
             if (n_bytes_read > 0) {
                 if ((n_bytes_written = write(poll_fds[IDX_TUN].fd, buf, n_bytes_read)) < 0) {
                     perror("write to tun");
                     return n_bytes_written;
                 }
-                printf("tun: wrote %d bytes\n", n_bytes_written);
+                printf("tun: wrote %zd bytes\n", n_bytes_written);
             }
         }
     }
