@@ -27,7 +27,7 @@ logger: Final[Logger] = logging.getLogger("ipops-printer")
 
 def _get_ipops_frames(existing_data: bytes) -> bytes:
     if existing_data:
-        if not select.select([sys.stdin], [], [], 1.5)[0]:  # TODO: Configure timeout
+        if not select.select([sys.stdin], [], [], 10)[0]:  # TODO: Configure timeout
             logger.debug("Timed-out while waiting for further IP packets")
             return existing_data
     else:
@@ -51,9 +51,10 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
 
     existing_data += sys.stdin.buffer.read(frame_size)
 
+    logger.debug("Current IPOPS frame buffer size: %d", len(existing_data))
+
     if len(existing_data) < 1500:  # TODO: Configure max buffer size
         logger.debug("Attempting to add more IP packets into a single IPOPS frame")
-        logger.debug("Current IPOPS frame buffer size: %d", len(existing_data))
         return _get_ipops_frames(existing_data)
 
     logger.debug("IPOPS frame buffer filled")
