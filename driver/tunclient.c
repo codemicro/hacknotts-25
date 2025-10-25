@@ -149,19 +149,39 @@ int open_fifo(const char *name, int oflag, mode_t mode) {
     return open(name, oflag);
 }
 
-#define OUTPUT_FILE_NAME "./tun-sink.fifo"
 #define USAGE_STR "usage: %s [TUN device name] [child process spawn command]\n"
 
-int parse_cli_args(int argc, char **argv, char **tun_device_ptr, char **child_process_cmd_ptr) {
+int parse_cli_args(int argc, char **argv, char **tun_device_ptr, char **child_process_cmd_ptr, char **downstream_fifo_filepath_ptr) {
+    char *input_path_ptr = "/var/run/printun";
+
+    int c;
+    while ((c = getopt(argc, argv, "f:")) != -1) {
+        switch (c) {
+            case -1:
+                break;
+            case 'f':
+                input_path_ptr = optarg;
+                break;
+            case '?':
+                goto help;
+            default:
+                break;
+        }
+    }
+
     if (argc < 3) {
-        fprintf(stderr, USAGE_STR, argv[0]);
-        return -1;
+        goto help;
     }
 
     *tun_device_ptr = argv[1];
     *child_process_cmd_ptr = argv[2];
+    *downstream_fifo_filepath_ptr = input_path_ptr;
 
     return 0;
+
+help:
+    fprintf(stderr, USAGE_STR, argv[0]);
+    return -1;
 }
 
 int start_child(const char *cmd, int *child_stdin_fd, int *child_pid) {
@@ -206,7 +226,8 @@ int main(int argc, char** argv) {
 
     char *tun_device_name;
     char *child_process_cmd;
-    if (parse_cli_args(argc, argv, &tun_device_name, &child_process_cmd) < 0) {
+    char *downstream_fifo_file_path;
+    if (parse_cli_args(argc, argv, &tun_device_name, &child_process_cmd, &downstream_fifo_file_path) < 0) {
         return 1;
     }
 
