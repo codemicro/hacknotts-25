@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from types import FrameType
     from typing import ClassVar, Final, Literal, Self, TextIO
 
-__all__: Sequence[str] = ("setup_logging",)
+__all__: Sequence[str] = ("PerformGracefulTermination", "setup_logging")
 
 
 logger: Final[Logger] = logging.getLogger("ipops-printer")
@@ -36,6 +36,10 @@ def setup_logging(*, verbosity: Literal[0, 1, 2, 3] = 1) -> None:
     logger.addHandler(console_logging_handler)
 
     logger.debug("Logger set up with minimum output level: %s", VERBOSITY_STRING)
+
+
+class PerformGracefulTermination(RuntimeError):  # noqa: N818
+    """"""
 
 
 class GracefulTerminationHandler:

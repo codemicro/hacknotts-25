@@ -35,7 +35,7 @@ class _IPOPS_PDF(FPDF):
         self.cell(0, 10, str(self.starting_page_num + self.page_no()), align="C")
 
 
-def text_to_pdf(text: str, starting_page_num: int) -> bytes:
+def text_to_pdf(text: str, starting_page_num: int) -> bytearray:
     """"""
     pdf: FPDF = _IPOPS_PDF(format="A4", starting_page_num=starting_page_num)
 
