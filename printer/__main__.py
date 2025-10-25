@@ -41,7 +41,7 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
 
     if frame_size == 0:
         logger.info("Skipping packet: size was %d bytes", frame_size)
-        return _get_ipops_frames(existing_data)
+        return existing_data
 
     if frame_size < 0:
         NEGATIVE_FRAME_SIZE_MESSAGE: Final[str] = f"Negative packet size: {frame_size} bytes."
