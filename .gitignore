@@ -225,6 +225,7 @@ local/
 *.sqlite3-journal
 *.db
 local_stubs/
+*.pdf
 
 # Unit test / coverage reports
 htmlcov/

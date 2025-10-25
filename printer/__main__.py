@@ -9,10 +9,7 @@ import sys
 from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
 
-from fpdf import FPDF
-from fpdf.enums import WrapMode
-
-from . import utils
+from . import pdf, utils
 from .utils import GracefulTerminationHandler
 
 if TYPE_CHECKING:
@@ -20,13 +17,14 @@ if TYPE_CHECKING:
     from logging import Logger
     from typing import Final
 
+
 __all__: Sequence[str] = ()
 
 
 logger: Final[Logger] = logging.getLogger("ipops-printer")
 
 
-def _print_stdin(lp_executable: str) -> None:
+def _print_stdin(lp_executable: str, page_count: int) -> None:
     while not select.select([sys.stdin], [], [], 0.15)[0]:  # TODO: Configure polling rate
         if GracefulTerminationHandler.EXIT_NOW:
             return
@@ -41,15 +39,9 @@ def _print_stdin(lp_executable: str) -> None:
 
     logger.debug("Byte reading completed successfully")
 
-    pdf: FPDF = FPDF(format="A4")
-    pdf.add_page()
-    pdf.set_font("Courier", size=12)
-    pdf.write(
-        text=base64.standard_b64encode(stdin_data).decode(),
-        wrapmode=WrapMode.CHAR,
+    pdf_bytes: bytes = pdf.text_to_pdf(
+        base64.standard_b64encode(stdin_data).decode(), starting_page_num=page_count
     )
-
-    pdf_bytes: bytes = pdf.output()
 
     logger.debug("Formatting PDF completed successfully")
 
@@ -89,13 +81,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
+    page_count: int = 0
+
     logger.info("Starting listener loop")
 
     GracefulTerminationHandler.setup()
 
     try:
         while not GracefulTerminationHandler.EXIT_NOW:
-            _print_stdin(lp_executable)
+            _print_stdin(lp_executable, page_count)
+
+            page_count += 1
+
     except CalledProcessError as e:
         logger.error("Subrocess call to 'lp' failed with exit code %d", e.returncode)  # noqa: TRY400
         logger.info("Subprocess call to 'lp' had stderr: %s", repr(e.stderr))
