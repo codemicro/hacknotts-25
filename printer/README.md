@@ -1,3 +1,3 @@
 ## Calling as a subprocess
 
-Use `uv run -m printer`.
+Use `uv run --no-group dev --frozen -m printer`.
