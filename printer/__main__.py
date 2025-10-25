@@ -61,21 +61,23 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
     return existing_data
 
 
-def _print_stdin(lp_executable: str, starting_page_num: int) -> int:
+def _run_print_loop(lp_executable: str, starting_page_num: int) -> int:
     try:
-        stdin_data: bytes = _get_ipops_frames(existing_data=b"")
+        ipops_frames_data: bytes = _get_ipops_frames(existing_data=b"")
     except PerformGracefulTermination:
         return starting_page_num
 
     logger.debug("Byte reading completed successfully")
 
-    if not stdin_data:
+    if not ipops_frames_data:
+        logger.debug("Skipping printing empty IPOPS frame")
         return starting_page_num
 
     pdf_bytes: bytearray
     pdf_pages_count: int
     pdf_bytes, pdf_pages_count = pdf.text_to_pdf(
-        base64.standard_b64encode(stdin_data).decode(), starting_page_num=starting_page_num
+        base64.standard_b64encode(ipops_frames_data).decode(),
+        starting_page_num=starting_page_num,
     )
 
     logger.debug("Formatting PDF completed successfully")
@@ -138,7 +140,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         while not GracefulTerminationHandler.EXIT_NOW:
-            page_count = _print_stdin(lp_executable, page_count)
+            page_count = _run_print_loop(lp_executable, page_count)
 
     except CalledProcessError as e:
         logger.error("Subrocess call to 'lp' failed with exit code %d", e.returncode)
