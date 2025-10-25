@@ -26,7 +26,7 @@ int tun_alloc(char *dev, int flags) {
      */
 
     /* open the clone device */
-    if( (fd = open(clonedev, O_RDWR)) < 0 ) {
+    if ((fd = open(clonedev, O_RDWR)) < 0) {
         return fd;
     }
 
@@ -43,7 +43,7 @@ int tun_alloc(char *dev, int flags) {
     }
 
     /* try to create the device */
-    if( (err = ioctl(fd, TUNSETIFF, (void *) &ifr)) < 0 ) {
+    if ((err = ioctl(fd, TUNSETIFF, (void *) &ifr)) < 0) {
         close(fd);
         return err;
     }
@@ -144,7 +144,8 @@ int open_fifo(const char *name, int oflag, mode_t mode) {
 
 #define USAGE_STR "usage: %s [-f] TUNDEV CHILDCMD\n\nTUNDEV is the TUN device to bind to\nCHILDCMD is a command that will be run as a child process and will have adapter data sent to\n\nOptions:\n  -f\tSet the file path to be used for FIFO IPC (default: %s)\n"
 
-int parse_cli_args(int argc, char **argv, char **tun_device_ptr, char **child_process_cmd_ptr, char **downstream_fifo_filepath_ptr) {
+int parse_cli_args(int argc, char **argv, char **tun_device_ptr, char **child_process_cmd_ptr,
+                   char **downstream_fifo_filepath_ptr) {
     char *input_path_ptr = "/var/run/printun";
 
     int c;
@@ -167,12 +168,12 @@ int parse_cli_args(int argc, char **argv, char **tun_device_ptr, char **child_pr
     }
 
     *tun_device_ptr = argv[optind];
-    *child_process_cmd_ptr = argv[optind+1];
+    *child_process_cmd_ptr = argv[optind + 1];
     *downstream_fifo_filepath_ptr = input_path_ptr;
 
     return 0;
 
-help:
+    help:
     fprintf(stderr, USAGE_STR, argv[0], input_path_ptr);
     return -1;
 }
@@ -214,7 +215,7 @@ int start_child(const char *cmd, int *child_stdin_fd, int *child_pid) {
     return 0;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     int err;
 
     char *tun_device_name;
@@ -256,14 +257,6 @@ int main(int argc, char** argv) {
     }
 
     printf("if_name=%s\n", if_name);
-
-    // open output file
-//    int output_fd = open_fifo(OUTPUT_FILE_NAME, O_RDWR, 0777);
-//    if (output_fd < 0) {
-//        perror("open output file");
-//        return 1;
-//    }
-//    printf("opened output %s\n", OUTPUT_FILE_NAME);
 
     printf("entering readloop\n");
 
