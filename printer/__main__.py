@@ -30,9 +30,6 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
         if not select.select([sys.stdin], [], [], 1.5)[0]:  # TODO: Configure timeout
             logger.debug("Timed-out while waiting for further IP packets")
             return existing_data
-
-        if GracefulTerminationHandler.EXIT_NOW:
-            raise PerformGracefulTermination
     else:
         while not select.select([sys.stdin], [], [], 0.15)[0]:  # TODO: Configure polling rate
             if GracefulTerminationHandler.EXIT_NOW:
@@ -54,10 +51,9 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
 
     existing_data += sys.stdin.buffer.read(frame_size)
 
-    logger.debug("Current IPOPS frame buffer size: %d", len(existing_data))
-
     if len(existing_data) < 1500:  # TODO: Configure max buffer size
         logger.debug("Attempting to add more IP packets into a single IPOPS frame")
+        logger.debug("Current IPOPS frame buffer size: %d", len(existing_data))
         return _get_ipops_frames(existing_data)
 
     logger.debug("IPOPS frame buffer filled")
