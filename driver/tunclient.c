@@ -149,14 +149,82 @@ int open_fifo(const char *name, int oflag, mode_t mode) {
     return open(name, oflag);
 }
 
-#define TUN_IF_NAME "tun13"
 #define OUTPUT_FILE_NAME "./tun-sink.fifo"
+#define USAGE_STR "usage: %s [TUN device name] [child process spawn command]\n"
+
+int parse_cli_args(int argc, char **argv, char **tun_device_ptr, char **child_process_cmd_ptr) {
+    if (argc < 3) {
+        fprintf(stderr, USAGE_STR, argv[0]);
+        return -1;
+    }
+
+    *tun_device_ptr = argv[1];
+    *child_process_cmd_ptr = argv[2];
+
+    return 0;
+}
+
+int start_child(const char *cmd, int *child_stdin_fd, int *child_pid) {
+    // start_child makes a pipe, forks and runs execp with cmd.
+    // the pipe is write-only.
+    // the fd of the pipe is placed in child_stdin_fd. the PID of the child is placed in child_pid
+    int err;
+
+    int pipe_fd[2];
+    if ((err = pipe(pipe_fd)) < 0) { // TODO: O_DIRECT packet mode?
+        return err;
+    }
+
+    int pid = fork();
+    if (pid < 0) {
+        return -1;
+    } else if (pid == 0) {
+        // this is the child now
+        if ((err = dup2(pipe_fd[0], STDIN_FILENO)) < 0) {
+            return err;
+        }
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
+        if (execlp("/bin/sh", "/bin/sh", "-c", cmd, NULL) < 0) {
+            exit(1);
+        }
+        exit(0);
+    }
+
+    *child_stdin_fd = pipe_fd[1];
+    close(pipe_fd[0]);
+
+    if (child_pid != NULL) {
+        *child_pid = pid;
+    }
+
+    return 0;
+}
 
 int main(int argc, char** argv) {
     int err;
-    char if_name[IFNAMSIZ] = TUN_IF_NAME;
 
-    // open IDX_TUN interface
+    char *tun_device_name;
+    char *child_process_cmd;
+    if (parse_cli_args(argc, argv, &tun_device_name, &child_process_cmd) < 0) {
+        return 1;
+    }
+
+    // Start child process
+
+    int child_stdin_fd;
+    int child_pid;
+    if (start_child(child_process_cmd, &child_stdin_fd, &child_pid) < 0) {
+        perror("start child");
+        return 1;
+    }
+
+    printf("child_pid=%d\n", child_pid);
+
+    // Open TUN interface
+
+    char if_name[IFNAMSIZ];
+    strncpy(if_name, tun_device_name, IFNAMSIZ);
     int tun_fd = tun_alloc(if_name, IFF_TUN | IFF_NO_PI);
     if (tun_fd < 0) {
         perror("tun_alloc()");
@@ -166,16 +234,16 @@ int main(int argc, char** argv) {
     printf("if_name=%s\n", if_name);
 
     // open output file
-    int output_fd = open_fifo(OUTPUT_FILE_NAME, O_RDWR, 0777);
-    if (output_fd < 0) {
-        perror("open output file");
-        return 1;
-    }
-    printf("opened output %s\n", OUTPUT_FILE_NAME);
+//    int output_fd = open_fifo(OUTPUT_FILE_NAME, O_RDWR, 0777);
+//    if (output_fd < 0) {
+//        perror("open output file");
+//        return 1;
+//    }
+//    printf("opened output %s\n", OUTPUT_FILE_NAME);
 
     printf("entering readloop\n");
 
-    if ((err = tun_readloop(tun_fd, output_fd)) < 0) {
+    if ((err = tun_readloop(tun_fd, child_stdin_fd)) < 0) {
         perror("tun_readloop()");
         return err;
     }
