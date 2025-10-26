@@ -72,14 +72,14 @@ def bytes_into_pdf(content: bytes, starting_page_number: int) -> tuple[bytearray
             logger.debug("Generating PDF with data matrix")
 
             page_index: int = starting_page_number
-            content_chunk: bytes
+            content_chunk: Sequence[int]
             for content_chunk in itertools.batched(
                 content, settings.MAX_BUFFER_SIZE, strict=False
             ):
                 pdf.add_page()
                 encoded_datamatrix: pylibdmtx.Encoded = pylibdmtx.encode(
                     page_index.to_bytes(length=1, byteorder="big")
-                    + base64.b85encode(content_chunk)
+                    + base64.b85encode(bytes(content_chunk))
                 )
                 pdf.image(
                     Image.frombytes(
