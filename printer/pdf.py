@@ -52,7 +52,9 @@ class _IPoPS_PDF(FPDF):
         self.set_y(-15)
         self.set_x(-15)
         self.set_font(
-            "dejavu-sans" if settings.PDF_DATA_FORMAT is PDFDataFormat.TEXT else "Courier",
+            "IPoPS-custom-font"
+            if settings.PDF_DATA_FORMAT is PDFDataFormat.TEXT
+            else "Courier",
             size=16,
         )
         self.cell(0, 10, str(self.starting_page_number + self.page_no()), align="C")
@@ -64,8 +66,11 @@ def bytes_into_pdf(content: bytes, starting_page_number: int) -> tuple[bytearray
 
     match settings.PDF_DATA_FORMAT:
         case PDFDataFormat.TEXT:
-            pdf.add_font("dejavu-sans", fname=_get_font_location("DejaVu Sans"))
-            pdf.set_font("dejavu-sans", size=12)
+            pdf.add_font(
+                "IPoPS-custom-font",
+                fname=_get_font_location("DejaVu Sans"),  # Allow configuration
+            )
+            pdf.set_font("IPoPS-custom-font", size=12)
             pdf.write(text=_encode_bytes_base64_for_ocr(content), wrapmode=WrapMode.CHAR)
 
         case PDFDataFormat.DATA_MATRIX:
@@ -86,7 +91,8 @@ def bytes_into_pdf(content: bytes, starting_page_number: int) -> tuple[bytearray
                         "RGB",
                         (encoded_datamatrix.width, encoded_datamatrix.height),
                         encoded_datamatrix.pixels,
-                    )
+                    ),
+                    w=0 if encoded_datamatrix.width < 550 else 550,
                 )
                 page_index += 1
 
