@@ -61,23 +61,23 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
     return existing_data
 
 
-def _run_print_loop(lp_executable: str, starting_page_num: int) -> int:
+def _run_print_loop(lp_executable: str, starting_page_number: int) -> int:
     try:
         ipops_frames_data: bytes = _get_ipops_frames(existing_data=b"")
     except PerformGracefulTermination:
-        return starting_page_num
+        return starting_page_number
 
     logger.debug("Byte reading completed successfully")
 
     if not ipops_frames_data:
         logger.debug("Skipping printing empty IPoPS frame")
-        return starting_page_num
+        return starting_page_number
 
     pdf_bytes: bytearray
     pdf_pages_count: int
     pdf_bytes, pdf_pages_count = pdf.text_to_pdf(
         base64.standard_b64encode(ipops_frames_data).decode(),
-        starting_page_num=starting_page_num,
+        starting_page_number=starting_page_number,
     )
 
     logger.debug("Formatting PDF completed successfully")
@@ -109,12 +109,11 @@ def _run_print_loop(lp_executable: str, starting_page_num: int) -> int:
 
     logger.debug("Printing PDF completed successfully")
 
-    return starting_page_num + pdf_pages_count
+    return starting_page_number + pdf_pages_count
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """"""
-    utils.setup_logging(verbosity=2)  # TODO: Make verbosity configurable
+    utils.setup_logging()
 
     if argv is None:
         argv = sys.argv[1:]
@@ -132,7 +131,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    page_count: int = 0
+    starting_page_number: int = utils.load_starting_page_number()
 
     logger.info("Starting listener loop")
 
@@ -140,7 +139,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         while not GracefulTerminationHandler.EXIT_NOW:
-            page_count = _run_print_loop(lp_executable, page_count)
+            starting_page_number = _run_print_loop(lp_executable, starting_page_number)
 
     except CalledProcessError as e:
         logger.error("Subrocess call to 'lp' failed with exit code %d", e.returncode)
@@ -153,6 +152,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     logger.info("Ended listener loop")
+
+    utils.save_starting_page_number(starting_page_number)
 
     logger.info("Exiting")
 

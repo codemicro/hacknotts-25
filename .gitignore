@@ -1,5 +1,3 @@
-driver/tunclient
-
 ### Python ###
 
 # Byte-compiled / optimized / DLL files
@@ -139,6 +137,7 @@ celerybeat.pid
 *.i*86
 *.x86_64
 *.hex
+driver/tunclient
 
 # Debug files
 *.dSYM/
@@ -228,6 +227,8 @@ local/
 *.db
 local_stubs/
 *.pdf
+*.png
+*.jpg
 
 # Unit test / coverage reports
 htmlcov/
