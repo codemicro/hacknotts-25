@@ -1,26 +1,23 @@
 """Console entry point for IPoPs-scanner."""
 
+import io
 import shutil
-import string
 import subprocess
+import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+import click
 import platformdirs
-import pytesseract
 from PIL import Image
+from pylibdmtx import pylibdmtx
 
 from . import utils
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
     from subprocess import CompletedProcess
     from typing import BinaryIO, Final, Literal
-
-import click
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 __all__: Sequence[str] = ("run",)
 
@@ -29,6 +26,59 @@ INTERMEDIARY_IMAGE_FORMAT: Final[Literal["png", "jpg", "tiff"]] = "tiff"
 APP_STATE_PATH: Final[Path] = platformdirs.user_state_path(
     "IPoPS-scanner", roaming=False, ensure_exists=True
 )
+
+
+def scan_and_send(
+    ctx: click.Context, scanimage_executable: str, start_page: int, virtual_pipe_file: BinaryIO
+) -> None:
+    click.echo("[*] Scanning...")
+
+    completed_scanimage_subprocess: CompletedProcess[bytes] = subprocess.run(
+        (scanimage_executable, "--format", INTERMEDIARY_IMAGE_FORMAT),
+        check=False,
+        capture_output=True,
+        text=False,
+        timeout=None,
+    )
+    if completed_scanimage_subprocess.returncode != 0:
+        click.echo(
+            (
+                f"Subrocess call to 'scanimage' failed with exit code {
+                    completed_scanimage_subprocess.returncode
+                }\nstderr: {completed_scanimage_subprocess.stderr.decode()!r}"
+            ),
+            err=True,
+        )
+        ctx.exit(3)
+
+    click.echo("[*] Parsing...")
+
+    Path(f"tempscan.{int(time.time())}.{INTERMEDIARY_IMAGE_FORMAT}").write_bytes(
+        completed_scanimage_subprocess.stdout
+    )
+
+    scanned_image: Image.Image = Image.open(
+        io.BytesIO(completed_scanimage_subprocess.stdout), formats=(INTERMEDIARY_IMAGE_FORMAT,)
+    )
+
+    result: Sequence[pylibdmtx.Decoded] = pylibdmtx.decode(scanned_image)
+    click.echo(f"[!] {result}")
+    if len(result) != 1:
+        click.echo("Decoding data matrices resulted in multiple outputs.", err=True)
+        ctx.exit(3)
+
+    if not result[0].data:
+        click.echo("Decoding data matrices resulted in no data.", err=True)
+        ctx.exit(3)
+
+    page_number: int = int(result[0].data[0])
+    payload: bytes = result[0].data[1:]
+    utils.save_data_for_page(page_number, payload)
+
+    click.echo(f"[*] Got page {page_number}")
+
+    if utils.send_lowest_contiguous_block(start_page) is not None:
+        virtual_pipe_file.write(payload)
 
 
 @click.command(
@@ -51,9 +101,10 @@ APP_STATE_PATH: Final[Path] = platformdirs.user_state_path(
 #     callback=_callback_mutually_exclusive_verbose_and_quiet,
 #     expose_value=False,
 # )
+@click.argument("start-page", type=int)
 @click.option("--virtual-pipe-file", type=click.File("wb"), default="/var/run/printun")
 @click.pass_context
-def run(ctx: click.Context, virtual_pipe_file: BinaryIO) -> None:
+def run(ctx: click.Context, start_page: int, virtual_pipe_file: BinaryIO) -> None:
     """Run cli entry-point."""
     scanimage_executable: str | None = shutil.which("scanimage")
     if scanimage_executable is None:
@@ -67,60 +118,24 @@ def run(ctx: click.Context, virtual_pipe_file: BinaryIO) -> None:
         )
         ctx.exit(2)
 
-    if shutil.which("tesseract") is None:
-        click.echo(
-            (
-                "The 'tesseract' executable could not be found.\n"
-                "Ensure tesseract-ocr is installed on your Linux system "
-                "and that the 'tesseract' binary is available on your PATH."
-            ),
-            err=True,
-        )
-        ctx.exit(2)
+    # if shutil.which("tesseract") is None:
+    #     click.echo(
+    #         (
+    #             "The 'tesseract' executable could not be found.\n"
+    #             "Ensure tesseract-ocr is installed on your Linux system "
+    #             "and that the 'tesseract' binary is available on your PATH."
+    #         ),
+    #         err=True,
+    #     )
+    #     ctx.exit(2)
 
-    completed_scanimage_subprocess: CompletedProcess[bytes] = subprocess.run(
-        (scanimage_executable, "--format", INTERMEDIARY_IMAGE_FORMAT),
-        check=False,
-        stdout=subprocess.PIPE,
-        text=False,
-        timeout=None,
-    )
-    if completed_scanimage_subprocess.returncode != 0:
-        click.echo(
-            (
-                f"Subrocess call to 'scanimage' failed with exit code {
-                    completed_scanimage_subprocess.returncode
-                }\nstderr: {completed_scanimage_subprocess.stderr!r}"
-            ),
-            err=True,
-        )
-        ctx.exit(3)
+    while True:
+        scan_and_send(ctx, scanimage_executable, start_page, virtual_pipe_file)
+        click.echo("[!] Page state: ", nl=False)
 
-    scanned_image: Image.Image = Image.open(
-        completed_scanimage_subprocess.stdout, formats=(INTERMEDIARY_IMAGE_FORMAT,)
-    )
+        for i, state in utils.get_page_states(start_page).items():
+            click.echo(f"{click.style(str(i), fg=state.value)} ", nl=False)
 
-    data: str
-    raw_page_number: str
-    data, _, raw_page_number = pytesseract.image_to_string(
-        scanned_image,
-        output_type="string",
-        config=f"--psm 6 -c tessedit_char_whitelist={string.ascii_letters}{string.digits}+/",
-    ).partition("\n\n")
-    data = data.translate(str.maketrans("", "", "\n\r "))
-    raw_page_number = raw_page_number.translate(
-        str.maketrans("=_—oOilLzZAbG", "---0011122466", "\n\r ")
-    )
+        click.echo("", nl=True)
 
-    try:
-        page_number: int = int(raw_page_number)
-    except ValueError:
-        click.echo(
-            f"Failed to parse page number as an integer: '{raw_page_number}'\n", err=True
-        )
-        ctx.exit(2)
-
-    previous_page_number: int = utils.load_previous_page_number()
-
-    if page_number == previous_page_number + 1:
-        virtual_pipe_file.write(b"hdisajhf83247hfwighfsdh" * 20)
+        click.confirm("[?] Send another? [y/N]", abort=True, default=False)

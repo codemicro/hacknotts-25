@@ -38,9 +38,9 @@ SCAN_STATE_FILE_PATH: Final[Path] = APP_STATE_PATH / f"state.{int(time.time())}"
 class PageState(enum.Enum):
     """"""
 
-    UNSEEN = enum.auto()
-    SEEN = enum.auto()
-    SENT = enum.auto()
+    UNSEEN = "red"
+    SEEN = "yellow"
+    SENT = "green"
 
 
 def load_previous_page_number() -> int:
