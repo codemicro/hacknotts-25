@@ -18,6 +18,7 @@ __all__: Sequence[str] = (
     "get_page_states",
     "load_previous_page_number",
     "save_previous_page_number",
+    "send_lowest_contiguous_block",
 )
 
 
@@ -115,6 +116,7 @@ def mark_data_as_sent(page_number: int) -> None:
 
 
 def send_lowest_contiguous_block(starting_page_number: int) -> bytes | None:
+    """"""
     state_file_data: StateFileData = (
         cast("StateFileData", json.loads(SCAN_STATE_FILE_PATH.read_text()))
         if SCAN_STATE_FILE_PATH.exists()
