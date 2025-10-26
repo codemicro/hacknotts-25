@@ -156,37 +156,37 @@ class Settings(abc.ABC):
         cls._settings["MAX_BUFFER_SIZE"] = max_buffer_size
 
     @classmethod
-    def _setup_contiguous_min_buffer_size(cls) -> None:
+    def _setup_min_contiguous_buffer_size(cls) -> None:
         if "MAX_BUFFER_SIZE" not in cls._settings:
             INVALID_SETUP_ORDER_MESSAGE: Final[str] = (
                 "Invalid setup order: MAX_BUFFER_SIZE must be set up "
-                "before CONTIGUOUS_MIN_BUFFER_SIZE can be set up."
+                "before MIN_CONTIGUOUS_BUFFER_SIZE can be set up."
             )
             raise RuntimeError(INVALID_SETUP_ORDER_MESSAGE)
 
-        raw_contiguous_min_buffer_size: str = os.getenv(
-            f"{ENVIRONMENT_VARIABLE_PREFIX}CONTIGUOUS_MIN_BUFFER_SIZE", default=""
+        raw_min_contiguous_buffer_size: str = os.getenv(
+            f"{ENVIRONMENT_VARIABLE_PREFIX}MIN_CONTIGUOUS_BUFFER_SIZE", default=""
         ).strip()
 
-        if not raw_contiguous_min_buffer_size:
-            cls._settings["CONTIGUOUS_MIN_BUFFER_SIZE"] = 1400
+        if not raw_min_contiguous_buffer_size:
+            cls._settings["MIN_CONTIGUOUS_BUFFER_SIZE"] = 1400
             return
 
-        INVALID_CONTIGUOUS_MIN_BUFFER_SIZE_MESSAGE: Final[str] = f"{
+        INVALID_MIN_CONTIGUOUS_BUFFER_SIZE_MESSAGE: Final[str] = f"{
             ENVIRONMENT_VARIABLE_PREFIX
-        }CONTIGUOUS_MIN_BUFFER_SIZE must be an integer between & including 1 to {
+        }MIN_CONTIGUOUS_BUFFER_SIZE must be an integer between & including 1 to {
             cast('int', cls._settings['MAX_BUFFER_SIZE']) - 1
         }."
 
         try:
-            contiguous_min_buffer_size: int = int(raw_contiguous_min_buffer_size)
+            min_contiguous_buffer_size: int = int(raw_min_contiguous_buffer_size)
         except ValueError as e:
-            raise ImproperlyConfiguredError(INVALID_CONTIGUOUS_MIN_BUFFER_SIZE_MESSAGE) from e
+            raise ImproperlyConfiguredError(INVALID_MIN_CONTIGUOUS_BUFFER_SIZE_MESSAGE) from e
 
-        if not 1 <= contiguous_min_buffer_size < cast("int", cls._settings["MAX_BUFFER_SIZE"]):
-            raise ImproperlyConfiguredError(INVALID_CONTIGUOUS_MIN_BUFFER_SIZE_MESSAGE)
+        if not 1 <= min_contiguous_buffer_size < cast("int", cls._settings["MAX_BUFFER_SIZE"]):
+            raise ImproperlyConfiguredError(INVALID_MIN_CONTIGUOUS_BUFFER_SIZE_MESSAGE)
 
-        cls._settings["CONTIGUOUS_MIN_BUFFER_SIZE"] = contiguous_min_buffer_size
+        cls._settings["MIN_CONTIGUOUS_BUFFER_SIZE"] = min_contiguous_buffer_size
 
     @classmethod
     def _setup_contiguous_data_timeout(cls) -> None:
@@ -277,7 +277,7 @@ class Settings(abc.ABC):
 
         cls._setup_logging()
         cls._setup_max_buffer_size()
-        cls._setup_contiguous_min_buffer_size()
+        cls._setup_min_contiguous_buffer_size()
         cls._setup_contiguous_data_timeout()
         cls._setup_new_frame_polling_rate()
         cls._setup_pdf_data_format()
