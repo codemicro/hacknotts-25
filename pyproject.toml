@@ -5,8 +5,9 @@ dev = [
     { include-group = "type-check" },
 ]
 lint-format = ["flake8-carrot>=0.1.1", "ruff>=0.13"]
-main = ["fpdf2>=2.8", "typed_classproperties>=1.1"]
 pre-commit = ["pre-commit>=4.0"]
+printer = ["fpdf2>=2.8", "typed_classproperties>=1.1"]
+scanner = ["pdf2image>=1.17", "pytesseract>=0.3"]
 type-check = ["mypy>=1.18.2", "ty", "types-fpdf2>=2.8"]
 
 
@@ -146,7 +147,7 @@ keep-runtime-typing = true
 
 
 [tool.uv]
-default-groups = ["dev", "main"]
+default-groups = ["dev", "printer", "scanner"]
 no-build = true
 package = false
 required-version = ">=0.6.10"

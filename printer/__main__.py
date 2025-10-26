@@ -120,7 +120,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv = sys.argv[1:]
 
     if argv:
-        logger.error("ipops-printer command line arguments not recognized")
+        logger.error("Command line arguments not recognized")
         return -1
 
     lp_executable: str | None = shutil.which("lp")
