@@ -1,9 +1,11 @@
 """"""
 
 import abc
+import enum
 import logging
 import os
 import re
+from enum import Enum
 from typing import TYPE_CHECKING, cast, final, override
 
 if TYPE_CHECKING:
@@ -12,7 +14,12 @@ if TYPE_CHECKING:
     from typing import Any, ClassVar, Final, LiteralString
 
 
-__all__: Sequence[str] = ("ImproperlyConfiguredError", "run_setup", "settings")
+__all__: Sequence[str] = (
+    "ImproperlyConfiguredError",
+    "PDFDataFormat",
+    "run_setup",
+    "settings",
+)
 
 
 logger: Final[Logger] = logging.getLogger("ipops-printer")
@@ -39,6 +46,13 @@ class ImproperlyConfiguredError(Exception):
         )
 
         super().__init__(self.message)
+
+
+class PDFDataFormat(Enum):
+    """"""
+
+    TEXT = enum.auto()
+    DATA_MATRIX = enum.auto()
 
 
 class Settings(abc.ABC):
@@ -223,6 +237,33 @@ class Settings(abc.ABC):
         cls._settings["NEW_FRAME_POLLING_RATE"] = new_frame_polling_rate
 
     @classmethod
+    def _setup_pdf_data_format(cls) -> None:
+        pdf_data_format: str = (
+            os.getenv(f"{ENVIRONMENT_VARIABLE_PREFIX}PDF_DATA_FORMAT", default="")
+            .strip()
+            .lower()
+            .replace("_", "-")
+            .replace(" ", "-")
+        )
+
+        if not pdf_data_format:
+            cls._settings["PDF_DATA_FORMAT"] = PDFDataFormat.DATA_MATRIX
+            return
+
+        if pdf_data_format in ("text", "txt", "raw", "string", "str", "base64"):
+            cls._settings["PDF_DATA_FORMAT"] = PDFDataFormat.TEXT
+            return
+
+        if pdf_data_format in ("matrix", "qr-code", "qrcode", "data-matrix"):
+            cls._settings["PDF_DATA_FORMAT"] = PDFDataFormat.DATA_MATRIX
+            return
+
+        INVALID_PDF_DATA_FORMAT_MESSAGE: Final[str] = f"{
+            ENVIRONMENT_VARIABLE_PREFIX
+        }PDF_DATA_FORMAT must be either 'data-matrix' or 'text'."
+        raise ImproperlyConfiguredError(INVALID_PDF_DATA_FORMAT_MESSAGE)
+
+    @classmethod
     def _setup_env_variables(cls) -> None:
         """
         Load environment values into the settings dictionary.
@@ -239,6 +280,7 @@ class Settings(abc.ABC):
         cls._setup_contiguous_min_buffer_size()
         cls._setup_contiguous_data_timeout()
         cls._setup_new_frame_polling_rate()
+        cls._setup_pdf_data_format()
 
         cls._is_env_variables_setup = True
 

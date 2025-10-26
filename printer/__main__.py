@@ -1,6 +1,5 @@
 """"""
 
-import base64
 import logging
 import re
 import select
@@ -76,9 +75,8 @@ def _run_print_loop(lp_executable: str, starting_page_number: int) -> int:
 
     pdf_bytes: bytearray
     pdf_pages_count: int
-    pdf_bytes, pdf_pages_count = pdf.text_to_pdf(
-        base64.standard_b64encode(ipops_frames_data).decode(),
-        starting_page_number=starting_page_number,
+    pdf_bytes, pdf_pages_count = pdf.bytes_into_pdf(
+        ipops_frames_data, starting_page_number=starting_page_number
     )
 
     logger.debug("Formatting PDF completed successfully")
