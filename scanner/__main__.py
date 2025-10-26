@@ -1,5 +1,6 @@
 """"""
 
+import base64
 import io
 import os
 from pathlib import Path
@@ -34,7 +35,7 @@ APP_STATE_PATH: Final[Path] = platformdirs.user_state_path(
 
 def parse_scanned_payload(inp: bytes) -> tuple[int, bytes]:
     assert len(inp) > 1, "input bytes too short to parse payload"
-    return int(inp[0]), inp[1:]
+    return int(inp[0]), base64.a85decode(inp[1:])
 
 
 def scan_and_send() -> None:
