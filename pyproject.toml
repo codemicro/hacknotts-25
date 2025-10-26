@@ -13,7 +13,12 @@ printer = [
     { include-group = "shared" },
 ]
 scanner = ["pillow>=12.0", "pytesseract>=0.3", { include-group = "shared" }]
-shared = ["platformdirs>=4.5"]
+shared = [
+    "pillow>=12.0.0",
+    "platformdirs>=4.5",
+    "pylibdmtx>=0.1.10",
+    "setuptools>=80.9.0",
+]
 type-check = ["mypy>=1.18.2", "ty", "types-fpdf2>=2.8"]
 
 
