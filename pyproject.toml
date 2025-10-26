@@ -6,12 +6,7 @@ dev = [
 ]
 lint-format = ["flake8-carrot>=0.1.1", "ruff>=0.13"]
 pre-commit = ["pre-commit>=4.0"]
-printer = [
-    "fpdf2>=2.8",
-    "python-dotenv>=1.0",
-    "typed_classproperties>=1.1",
-    { include-group = "shared" },
-]
+printer = ["fpdf2>=2.8", "typed_classproperties>=1.1", { include-group = "shared" }]
 scanner = ["pillow>=12.0", "pytesseract>=0.3", { include-group = "shared" }]
 shared = ["platformdirs>=4.5"]
 type-check = ["mypy>=1.18.2", "ty", "types-fpdf2>=2.8"]

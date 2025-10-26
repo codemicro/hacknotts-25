@@ -10,7 +10,8 @@ import sys
 from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
 
-from . import pdf, utils
+from . import config, pdf, utils
+from .config import settings
 from .utils import GracefulTerminationHandler, PerformGracefulTermination
 
 if TYPE_CHECKING:
@@ -27,11 +28,11 @@ logger: Final[Logger] = logging.getLogger("ipops-printer")
 
 def _get_ipops_frames(existing_data: bytes) -> bytes:
     if existing_data:
-        if not select.select([sys.stdin], [], [], 10)[0]:  # TODO: Configure timeout
+        if not select.select([sys.stdin], [], [], settings.CONTIGUOUS_DATA_TIMEOUT)[0]:
             logger.debug("Timed-out while waiting for further IP packets")
             return existing_data
     else:
-        while not select.select([sys.stdin], [], [], 0.15)[0]:  # TODO: Configure polling rate
+        while not select.select([sys.stdin], [], [], settings.NEW_FRAME_POLLING_RATE)[0]:
             if GracefulTerminationHandler.EXIT_NOW:
                 raise PerformGracefulTermination
 
@@ -53,7 +54,7 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
 
     logger.debug("Current IPoPS frame buffer size: %d", len(existing_data))
 
-    if len(existing_data) < utils.get_max_buffer_size():  # TODO: Configure max buffer size
+    if len(existing_data) < settings.MIN_CONTIGUOUS_BUFFER_SIZE:
         logger.debug("Attempting to add more IP packets into a single IPoPS frame")
         return _get_ipops_frames(existing_data)
 
@@ -113,7 +114,7 @@ def _run_print_loop(lp_executable: str, starting_page_number: int) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    utils.setup_logging()
+    config.run_setup()
 
     if argv is None:
         argv = sys.argv[1:]
