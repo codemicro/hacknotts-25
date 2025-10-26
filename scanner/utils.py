@@ -4,16 +4,28 @@ import base64
 import enum
 import json
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import platformdirs
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, MutableMapping, MutableSequence, Sequence
     from pathlib import Path
-    from typing import Final
+    from typing import Final, TypedDict
 
-__all__: Sequence[str] = ("load_previous_page_number", "save_previous_page_number")
+__all__: Sequence[str] = (
+    "PageState",
+    "get_page_states",
+    "load_previous_page_number",
+    "save_previous_page_number",
+)
+
+
+if TYPE_CHECKING:
+
+    class StateFileData(TypedDict):
+        data: MutableMapping[str, str]
+        sent: MutableSequence[int]
 
 
 APP_STATE_PATH: Final[Path] = platformdirs.user_state_path(
@@ -23,12 +35,12 @@ PREVIOUS_PAGE_NUMBER_FILE_PATH: Final[Path] = APP_STATE_PATH / "previous_page_nu
 SCAN_STATE_FILE_PATH: Final[Path] = APP_STATE_PATH / f"state.{int(time.time())}"
 
 
-def ansi_red(x: str) -> str:
-    return f"\x1b[91m{x}\x1b[0m"
+class PageState(enum.Enum):
+    """"""
 
-
-def ansi_green(x: str) -> str:
-    return f"\x1b[92m{x}\x1b[0m"
+    UNSEEN = enum.auto()
+    SEEN = enum.auto()
+    SENT = enum.auto()
 
 
 def load_previous_page_number() -> int:
@@ -53,66 +65,72 @@ def save_previous_page_number(starting_page_number: int, /) -> None:
     )
 
 
-class PageState(enum.Enum):
-    UNSEEN = enum.auto()
-    SEEN = enum.auto()
-    SENT = enum.auto()
+def _get_highest_known_page_number(page_numbers: Iterable[int | str]) -> int:
+    return max(int(page_number) for page_number in page_numbers)
 
 
-def get_page_state(starting_page_number: int) -> list[tuple[int, bool]]:
-    fcont = json.loads(SCAN_STATE_FILE_PATH.read_text())
-    highest_known = max(map(int, fcont["data"].keys()))
-    res = []
-    for i in range(starting_page_number, highest_known + 1):
-        res.append(
-            (
-                i,
-                (
-                    PageState.SENT
-                    if i in fcont["sent"]
-                    else PageState.SEEN
-                    if str(i) in fcont["data"]
-                    else PageState.UNSEEN
-                ),
-            )
+def get_page_states(starting_page_number: int) -> MutableMapping[int, PageState]:
+    """"""
+    state_file_data: StateFileData = (
+        cast("StateFileData", json.loads(SCAN_STATE_FILE_PATH.read_text()))
+        if SCAN_STATE_FILE_PATH.exists()
+        else {"sent": [], "data": {}}
+    )
+    return {
+        page_number: (
+            PageState.SENT
+            if page_number in state_file_data["sent"]
+            else PageState.SEEN
+            if str(page_number) in state_file_data["data"]
+            else PageState.UNSEEN
         )
-    return res
+        for page_number in range(
+            starting_page_number, _get_highest_known_page_number(state_file_data["data"]) + 1
+        )
+    }
 
 
 def save_data_for_page(page_number: int, data: bytes) -> None:
-    if SCAN_STATE_FILE_PATH.exists():
-        fcont = json.loads(SCAN_STATE_FILE_PATH.read_text())
-    else:
-        fcont = {"sent": [], "data": {}}
+    state_file_data: StateFileData = (
+        cast("StateFileData", json.loads(SCAN_STATE_FILE_PATH.read_text()))
+        if SCAN_STATE_FILE_PATH.exists()
+        else {"sent": [], "data": {}}
+    )
 
-    fcont["data"][page_number] = base64.standard_b64encode(data).decode()
+    state_file_data["data"][str(page_number)] = base64.standard_b64encode(data).decode()
 
-    SCAN_STATE_FILE_PATH.write_text(json.dumps(fcont))
+    SCAN_STATE_FILE_PATH.write_text(json.dumps(state_file_data))
 
 
 def mark_data_as_sent(page_number: int) -> None:
-    fcont = json.loads(SCAN_STATE_FILE_PATH.read_text())
-    fcont["sent"].append(page_number)
-    SCAN_STATE_FILE_PATH.write_text(json.dumps(fcont))
+    state_file_data: StateFileData = (
+        cast("StateFileData", json.loads(SCAN_STATE_FILE_PATH.read_text()))
+        if SCAN_STATE_FILE_PATH.exists()
+        else {"sent": [], "data": {}}
+    )
+
+    state_file_data["sent"].append(page_number)
+
+    SCAN_STATE_FILE_PATH.write_text(json.dumps(state_file_data))
 
 
 def send_lowest_contiguous_block(starting_page_number: int) -> bytes | None:
-    fcont = json.loads(SCAN_STATE_FILE_PATH.read_text())
-
-    if len(fcont["sent"]) == 0:
-        highest_sent = starting_page_number - 1
-    else:
-        highest_sent = max(fcont["sent"])
-
-    highest_known = max(map(int, fcont["data"].keys()))
+    state_file_data: StateFileData = (
+        cast("StateFileData", json.loads(SCAN_STATE_FILE_PATH.read_text()))
+        if SCAN_STATE_FILE_PATH.exists()
+        else {"sent": [], "data": {}}
+    )
 
     to_send = []
-
-    i = highest_sent + 1
-    while i <= highest_known:
-        if i in fcont["sent"]:
+    i = (
+        max(state_file_data["sent"]) + 1
+        if len(state_file_data["sent"]) > 0
+        else starting_page_number
+    )
+    while i <= _get_highest_known_page_number(state_file_data["data"]):
+        if i in state_file_data["sent"]:
             continue
-        if str(i) not in fcont["data"]:
+        if str(i) not in state_file_data["data"]:
             break
         to_send.append(i)
         i += 1
@@ -120,6 +138,10 @@ def send_lowest_contiguous_block(starting_page_number: int) -> bytes | None:
     if not to_send:
         return None
 
-    fcont["sent"] += to_send
-    SCAN_STATE_FILE_PATH.write_text(json.dumps(fcont))
-    return b"".join(map(base64.standard_b64decode, [fcont["data"][str(x)] for x in to_send]))
+    state_file_data["sent"].extend(to_send)
+
+    SCAN_STATE_FILE_PATH.write_text(json.dumps(state_file_data))
+
+    return b"".join(
+        base64.standard_b64decode(state_file_data["data"][str(x)]) for x in to_send
+    )
