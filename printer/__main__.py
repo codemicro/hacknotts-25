@@ -53,7 +53,7 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
 
     logger.debug("Current IPoPS frame buffer size: %d", len(existing_data))
 
-    if len(existing_data) < 2000:  # TODO: Configure max buffer size
+    if len(existing_data) < utils.get_max_buffer_size():  # TODO: Configure max buffer size
         logger.debug("Attempting to add more IP packets into a single IPoPS frame")
         return _get_ipops_frames(existing_data)
 

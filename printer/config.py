@@ -25,6 +25,20 @@ LOG_LEVEL_VALUES: Final[Collection[LiteralString]] = (
     "ERROR",
     "CRITICAL",
 )
+ENVIRONMENT_VARIABLE_PREFIX: Final[LiteralString] = "IPOPS_PRINTER_"
+
+
+class ImproperlyConfiguredError(Exception):
+    """Exception class to raise when environment variables are not correctly provided."""
+
+    @override
+    def __init__(self, message: str | None = None) -> None:
+        """Initialise a new exception with the given error message."""
+        self.message: str = (
+            message or "One or more provided environment variable values are invalid."
+        )
+
+        super().__init__(self.message)
 
 
 class Settings(abc.ABC):
@@ -103,18 +117,29 @@ class Settings(abc.ABC):
 
         logger.debug("Logger set up with minimum output level: %s", log_level)
 
-    def _get_max_buffer_size() -> int:
+    @classmethod
+    def _setup_max_buffer_size(cls) -> None:
         raw_max_buffer_size: str = os.getenv(
-            "IPOPS_PRINTER_MAX_BUFFER_SIZE", default=""
+            f"{ENVIRONMENT_VARIABLE_PREFIX}MAX_BUFFER_SIZE", default=""
         ).strip()
 
         if not raw_max_buffer_size:
-            raw_max_buffer_size = "2000"
+            cls._settings["MAX_BUFFER_SIZE"] = 1500
+            return
 
         try:
-            return int(raw_max_buffer_size)
+            max_buffer_size: int = int(raw_max_buffer_size)
         except ValueError as e:
-            INVALID_MAX_BUFFER_SIZE_MESSAGE: Final[str] = (
-                f"Invalid value for IPOPS_PRINTER_MAX_BUFFER_SIZE: {raw_max_buffer_size}"
-            )
+            INVALID_MAX_BUFFER_SIZE_MESSAGE: Final[str] = f"Invalid value for {
+                ENVIRONMENT_VARIABLE_PREFIX
+            }MAX_BUFFER_SIZE: {raw_max_buffer_size}"
             raise ValueError(INVALID_MAX_BUFFER_SIZE_MESSAGE) from e
+
+        if not 0 <= raw_ping_command_easter_egg_probability <= 100:
+            raise ImproperlyConfiguredError(
+                INVALID_PING_COMMAND_EASTER_EGG_PROBABILITY_MESSAGE
+            )
+
+        cls._settings["PING_COMMAND_EASTER_EGG_PROBABILITY"] = (
+            raw_ping_command_easter_egg_probability
+        )
