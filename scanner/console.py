@@ -86,25 +86,10 @@ def scan_and_send(
     context_settings={"help_option_names": ["-h", "--help"]},
     help="Ingest an IPoPS frame as a selection of IP packets.",
 )
-@click.version_option(None, "-V", "--version")
-# @click.option(
-#     "-v",
-#     "--verbose",
-#     count=True,
-#     callback=_callback_verbose,
-#     expose_value=False,
-# )
-# @click.option(
-#     "-q",
-#     "--quiet",
-#     is_flag=True,
-#     callback=_callback_mutually_exclusive_verbose_and_quiet,
-#     expose_value=False,
-# )
-@click.argument("start-page", type=int)
+@click.argument("start-page-number", type=int)
 @click.option("--virtual-pipe-file", type=click.File("wb"), default="/var/run/printun")
 @click.pass_context
-def run(ctx: click.Context, start_page: int, virtual_pipe_file: BinaryIO) -> None:
+def run(ctx: click.Context, start_page_number: int, virtual_pipe_file: BinaryIO) -> None:
     """Run cli entry-point."""
     scanimage_executable: str | None = shutil.which("scanimage")
     if scanimage_executable is None:
@@ -128,12 +113,11 @@ def run(ctx: click.Context, start_page: int, virtual_pipe_file: BinaryIO) -> Non
     #         err=True,
     #     )
     #     ctx.exit(2)
-
     while True:
-        scan_and_send(ctx, scanimage_executable, start_page, virtual_pipe_file)
+        scan_and_send(ctx, scanimage_executable, start_page_number, virtual_pipe_file)
         click.echo("[!] Page state: ", nl=False)
 
-        for i, state in utils.get_page_states(start_page).items():
+        for i, state in utils.get_page_states(start_page_number).items():
             click.echo(f"{click.style(str(i), fg=state.value)} ", nl=False)
 
         click.echo("", nl=True)
