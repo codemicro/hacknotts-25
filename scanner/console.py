@@ -1,9 +1,11 @@
 """Console entry point for IPoPs-scanner."""
 
+import enum
 import io
 import shutil
 import subprocess
 import time
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,7 +21,7 @@ if TYPE_CHECKING:
     from subprocess import CompletedProcess
     from typing import BinaryIO, Final, Literal
 
-__all__: Sequence[str] = ("run",)
+__all__: Sequence[str] = ("PDFDataFormat", "run")
 
 
 INTERMEDIARY_IMAGE_FORMAT: Final[Literal["png", "jpg", "tiff"]] = "tiff"
@@ -28,51 +30,79 @@ APP_STATE_PATH: Final[Path] = platformdirs.user_state_path(
 )
 
 
-def scan_and_send(
-    ctx: click.Context, scanimage_executable: str, start_page: int, virtual_pipe_file: BinaryIO
-) -> None:
-    click.echo("[*] Scanning...")
+class PDFDataFormat(Enum):
+    """"""
 
-    completed_scanimage_subprocess: CompletedProcess[bytes] = subprocess.run(
-        (scanimage_executable, "--format", INTERMEDIARY_IMAGE_FORMAT),
-        check=False,
-        capture_output=True,
-        text=False,
-        timeout=None,
-    )
-    if completed_scanimage_subprocess.returncode != 0:
-        click.echo(
-            (
-                f"Subrocess call to 'scanimage' failed with exit code {
-                    completed_scanimage_subprocess.returncode
-                }\nstderr: {completed_scanimage_subprocess.stderr.decode()!r}"
-            ),
-            err=True,
+    TEXT = enum.auto()
+    DATA_MATRIX = enum.auto()
+
+
+def _scan_and_send(
+    ctx: click.Context,
+    scanimage_executable: str,
+    start_page: int,
+    virtual_pipe_file: BinaryIO,
+    local_input_file: BinaryIO | None,
+    pdf_data_format: PDFDataFormat,
+) -> None:
+    if local_input_file is None:
+        click.echo("[*] Scanning...")
+
+        completed_scanimage_subprocess: CompletedProcess[bytes] = subprocess.run(
+            (scanimage_executable, "--format", INTERMEDIARY_IMAGE_FORMAT),
+            check=False,
+            capture_output=True,
+            text=False,
+            timeout=None,
         )
-        ctx.exit(3)
+        if completed_scanimage_subprocess.returncode != 0:
+            click.echo(
+                (
+                    f"Subrocess call to 'scanimage' failed with exit code {
+                        completed_scanimage_subprocess.returncode
+                    }\nstderr: {completed_scanimage_subprocess.stderr.decode()!r}"
+                ),
+                err=True,
+            )
+            ctx.exit(3)
+
+        Path(f"tempscan.{int(time.time())}.{INTERMEDIARY_IMAGE_FORMAT}").write_bytes(
+            completed_scanimage_subprocess.stdout
+        )
+
+        scanned_image: Image.Image = Image.open(
+            io.BytesIO(completed_scanimage_subprocess.stdout),
+            formats=(INTERMEDIARY_IMAGE_FORMAT,),
+        )
+
+    else:
+        raise NotImplementedError
+
+    scanned_image: Image.Image = Image.open(image_buffer, formats=(INTERMEDIARY_IMAGE_FORMAT,))
 
     click.echo("[*] Parsing...")
 
-    Path(f"tempscan.{int(time.time())}.{INTERMEDIARY_IMAGE_FORMAT}").write_bytes(
-        completed_scanimage_subprocess.stdout
-    )
+    page_number: int
+    payload: bytes
 
-    scanned_image: Image.Image = Image.open(
-        io.BytesIO(completed_scanimage_subprocess.stdout), formats=(INTERMEDIARY_IMAGE_FORMAT,)
-    )
+    match pdf_data_format:
+        case PDFDataFormat.DATA_MATRIX:
+            result: Sequence[pylibdmtx.Decoded] = pylibdmtx.decode(scanned_image)
+            click.echo(f"[!] {result}")
+            if len(result) != 1:
+                click.echo("Decoding data matrices resulted in multiple outputs.", err=True)
+                ctx.exit(3)
 
-    result: Sequence[pylibdmtx.Decoded] = pylibdmtx.decode(scanned_image)
-    click.echo(f"[!] {result}")
-    if len(result) != 1:
-        click.echo("Decoding data matrices resulted in multiple outputs.", err=True)
-        ctx.exit(3)
+            if not result[0].data:
+                click.echo("Decoding data matrices resulted in no data.", err=True)
+                ctx.exit(3)
 
-    if not result[0].data:
-        click.echo("Decoding data matrices resulted in no data.", err=True)
-        ctx.exit(3)
+            page_number = int(result[0].data[0])
+            payload = result[0].data[1:]
 
-    page_number: int = int(result[0].data[0])
-    payload: bytes = result[0].data[1:]
+        case PDFDataFormat.TEXT:
+            raise NotImplementedError
+
     utils.save_data_for_page(page_number, payload)
 
     click.echo(f"[*] Got page {page_number}")
@@ -87,9 +117,19 @@ def scan_and_send(
     help="Ingest an IPoPS frame as a selection of IP packets.",
 )
 @click.argument("start-page-number", type=int)
-@click.option("--virtual-pipe-file", type=click.File("wb"), default="/var/run/printun")
+@click.option("-p", "--virtual-pipe-file", type=click.File("wb"), default="/var/run/printun")
+@click.option("-f", "--local-input-file", type=click.File("rb"))
+@click.option(
+    "-d", "--pdf-data-format", type=click.Choice(PDFDataFormat, case_sensitive=False)
+)
 @click.pass_context
-def run(ctx: click.Context, start_page_number: int, virtual_pipe_file: BinaryIO) -> None:
+def run(
+    ctx: click.Context,
+    start_page_number: int,
+    virtual_pipe_file: BinaryIO,
+    local_input_file: BinaryIO | None,
+    pdf_data_format: PDFDataFormat,
+) -> None:
     """Run cli entry-point."""
     scanimage_executable: str | None = shutil.which("scanimage")
     if scanimage_executable is None:
@@ -103,18 +143,21 @@ def run(ctx: click.Context, start_page_number: int, virtual_pipe_file: BinaryIO)
         )
         ctx.exit(2)
 
-    # if shutil.which("tesseract") is None:
-    #     click.echo(
-    #         (
-    #             "The 'tesseract' executable could not be found.\n"
-    #             "Ensure tesseract-ocr is installed on your Linux system "
-    #             "and that the 'tesseract' binary is available on your PATH."
-    #         ),
-    #         err=True,
-    #     )
-    #     ctx.exit(2)
+    if pdf_data_format is PDFDataFormat.TEXT and shutil.which("tesseract") is None:
+        click.echo(
+            (
+                "The 'tesseract' executable could not be found.\n"
+                "Ensure tesseract-ocr is installed on your Linux system "
+                "and that the 'tesseract' binary is available on your PATH."
+            ),
+            err=True,
+        )
+        ctx.exit(2)
+
     while True:
-        scan_and_send(ctx, scanimage_executable, start_page_number, virtual_pipe_file)
+        _scan_and_send(
+            ctx, scanimage_executable, start_page_number, virtual_pipe_file, pdf_data_format
+        )
         click.echo("[!] Page state: ", nl=False)
 
         for i, state in utils.get_page_states(start_page_number).items():
