@@ -64,7 +64,9 @@ def bytes_into_pdf(content: bytes, starting_page_number: int) -> tuple[bytearray
             pdf.write(text=_encode_bytes_base64_for_ocr(content), wrapmode=WrapMode.CHAR)
 
         case PDFDataFormat.DATA_MATRIX:
-            encoded_datamatrix: pylibdmtx.Encoded = pylibdmtx.encode(content)
+            encoded_datamatrix: pylibdmtx.Encoded = pylibdmtx.encode(
+                starting_page_number.to_bytes(length=1, byteorder="big") + content
+            )
             pdf.image(
                 Image.frombytes(
                     "RGB",
