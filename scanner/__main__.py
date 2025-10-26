@@ -1,13 +1,17 @@
 """"""
 
+import io
+import os
+from pathlib import Path
 import shutil
 import string
 import subprocess
 import sys
+import time
 from typing import TYPE_CHECKING
 
 import platformdirs
-import pytesseract
+from pylibdmtx import pylibdmtx
 from PIL import Image
 
 from . import utils
@@ -22,20 +26,18 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = ()
 
 
-INTERMEDIARY_IMAGE_FORMAT: Final[Literal["png", "jpg", "tiff"]] = "tiff"
+INTERMEDIARY_IMAGE_FORMAT: Final[Literal["png", "jpeg", "tiff"]] = "jpeg"
 APP_STATE_PATH: Final[Path] = platformdirs.user_state_path(
     "IPoPS-scanner", roaming=False, ensure_exists=True
 )
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    if argv is None:
-        argv = sys.argv[1:]
+def parse_scanned_payload(inp: bytes) -> tuple[int, bytes]:
+    assert len(inp) > 1, "input bytes too short to parse payload"
+    return int(inp[0]), inp[1:]
 
-    if argv:
-        sys.stderr.write("Command line arguments not recognized\n")
-        return -1
 
+def scan_and_send() -> None:
     scanimage_executable: str | None = shutil.which("scanimage")
     if scanimage_executable is None:
         sys.stderr.write(
@@ -45,13 +47,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    if shutil.which("tesseract") is None:
-        sys.stderr.write(
-            "The 'tesseract' executable could not be found.\n"
-            "Ensure tesseract-ocr is installed on your Linux system "
-            "and that the 'tesseract' binary is available on your PATH."
-        )
-        return 1
+    print("[*] Scanning...")
 
     completed_scanimage_subprocess: CompletedProcess[bytes] = subprocess.run(
         (scanimage_executable, "--format", INTERMEDIARY_IMAGE_FORMAT),
@@ -67,35 +63,58 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 3
 
+    print("[*] Parsing...")
+
+    with open(f"tempscan.{int(time.time())}.{INTERMEDIARY_IMAGE_FORMAT}", "wb") as f:
+        f.write(completed_scanimage_subprocess.stdout)
+ 
     scanned_image: Image.Image = Image.open(
-        completed_scanimage_subprocess.stdout, formats=(INTERMEDIARY_IMAGE_FORMAT,)
+        io.BytesIO(completed_scanimage_subprocess.stdout), formats=(INTERMEDIARY_IMAGE_FORMAT,)
     )
 
-    data: str
-    raw_page_number: str
-    data, _, raw_page_number = pytesseract.image_to_string(
-        scanned_image,
-        output_type="string",
-        config=f"--psm 6 -c tessedit_char_whitelist={string.ascii_letters}{string.digits}+/",
-    ).partition("\n\n")
-    data = data.translate(str.maketrans("", "", "\n\r "))
-    raw_page_number = raw_page_number.translate(
-        str.maketrans("=_—oOilLzZAbG", "---0011122466", "\n\r ")
-    )
+    result = pylibdmtx.decode(scanned_image)
+    print(f"[!] {result}")
+    assert len(result) == 1
+    raw_data = result[0].data
 
-    try:
-        page_number: int = int(raw_page_number)
-    except ValueError:
-        sys.stderr.write(f"Failed to parse page number as an integer: '{raw_page_number}'\n")
-        return 2
+    page_number, payload = parse_scanned_payload(raw_data)
+    utils.save_data_for_page(page_number, payload)
 
-    previous_page_number: int = utils.load_previous_page_number()
+    print(f"[*] Got page {page_number}")
+    
+    bytes_to_send = utils.send_lowest_contiguous_block()
+    if bytes_to_send is not None:
+        with Path(os.environ.get("IPOPS_INBOUND_PATH", "/var/run/printun")).open("wb") as f:
+            f.write(payload)
 
-    if page_number == previous_page_number + 1:
-    # with Path(os.environ.get("IPOPS_INBOUND_PATH", "/var/run/printun")).open(
-    #     "wb"
-    # ) as virtual_file:
-    #     virtual_file.write(b"hdisajhf83247hfwighfsdh" * 20)
+
+def main(argv: Sequence[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+
+    if argv:
+        sys.stderr.write("Command line arguments not recognized\n")
+        return -1
+
+    while True:
+        input("[?] Place a document on the scanner and press <ENTER>")
+        scan_and_send()
+        print("[!] Page state: ", end="")
+
+        for (i, state) in utils.get_page_state():
+            fmt_fn = str
+
+            if state == utils.PageState.UNSEEN:
+                fmt_fn = utils.ansi_red
+            elif state == utils.PageState.SENT:
+                fmt_fn = utils.ansi_green
+
+            print(fmt_fn(str(i)), end=" ")
+        print()
+
+        go = input("[?] Send another? [y/N] ")
+        if go != "y":
+            break
 
     return 0
 
