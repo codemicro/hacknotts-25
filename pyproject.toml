@@ -122,7 +122,7 @@ extend-ignore-names = [
     "EXIT_NOW",
     "INVALID_*_MESSAGE",
     "NO_*_MESSAGE",
-    "_IPOPS_PDF",
+    "_IPoPS_PDF",
 ]
 
 [tool.ruff.lint.pycodestyle]

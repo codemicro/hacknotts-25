@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = ("text_to_pdf",)
 
 
-class _IPOPS_PDF(FPDF):
+class _IPoPS_PDF(FPDF):
     @override
     def __init__(
         self,
@@ -37,7 +37,7 @@ class _IPOPS_PDF(FPDF):
 
 def text_to_pdf(text: str, starting_page_num: int) -> tuple[bytearray, int]:
     """"""
-    pdf: FPDF = _IPOPS_PDF(format="A4", starting_page_num=starting_page_num)
+    pdf: FPDF = _IPoPS_PDF(format="A4", starting_page_num=starting_page_num)
 
     pdf.add_page()
     pdf.set_font("Courier", size=12)

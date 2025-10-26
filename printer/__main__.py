@@ -51,13 +51,13 @@ def _get_ipops_frames(existing_data: bytes) -> bytes:
 
     existing_data += sys.stdin.buffer.read(frame_size)
 
-    logger.debug("Current IPOPS frame buffer size: %d", len(existing_data))
+    logger.debug("Current IPoPS frame buffer size: %d", len(existing_data))
 
-    if len(existing_data) < 1500:  # TODO: Configure max buffer size
-        logger.debug("Attempting to add more IP packets into a single IPOPS frame")
+    if len(existing_data) < 2000:  # TODO: Configure max buffer size
+        logger.debug("Attempting to add more IP packets into a single IPoPS frame")
         return _get_ipops_frames(existing_data)
 
-    logger.debug("IPOPS frame buffer filled")
+    logger.debug("IPoPS frame buffer filled")
     return existing_data
 
 
@@ -70,7 +70,7 @@ def _run_print_loop(lp_executable: str, starting_page_num: int) -> int:
     logger.debug("Byte reading completed successfully")
 
     if not ipops_frames_data:
-        logger.debug("Skipping printing empty IPOPS frame")
+        logger.debug("Skipping printing empty IPoPS frame")
         return starting_page_num
 
     pdf_bytes: bytearray
