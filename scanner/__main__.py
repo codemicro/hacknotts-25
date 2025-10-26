@@ -102,7 +102,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         scan_and_send()
         print("[!] Page state: ", end="")
 
-        for (i, state) in utils.get_page_state():
+        page_state = utils.get_page_state()
+        for (i, state) in page_state:
             fmt_fn = str
 
             if state == utils.PageState.UNSEEN:
@@ -111,7 +112,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 fmt_fn = utils.ansi_green
 
             print(fmt_fn(str(i)), end=" ")
-        print()
+        print(f"\n[!] {sum(1 for (_, x) in page_state if x == utils.PageState.UNSEEN)} missing, {sum(1 for (_, x) in page_state if x == utils.PageState.SEEN)} queued and {sum(1 for (_, x) in page_state if x == utils.PageState.SENT)} sent")
 
         go = input("[?] Send another? [y/N] ")
         if go != "y":
