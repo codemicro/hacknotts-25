@@ -13,10 +13,9 @@ from . import utils
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from io import BytesIO
     from pathlib import Path
     from subprocess import CompletedProcess
-    from typing import Final, Literal
+    from typing import BinaryIO, Final, Literal
 
 import click
 
@@ -54,7 +53,7 @@ APP_STATE_PATH: Final[Path] = platformdirs.user_state_path(
 # )
 @click.option("--virtual-pipe-file", type=click.File("wb"), default="/var/run/printun")
 @click.pass_context
-def run(ctx: click.Context, virtual_pipe_file: BytesIO) -> None:
+def run(ctx: click.Context, virtual_pipe_file: BinaryIO) -> None:
     """Run cli entry-point."""
     scanimage_executable: str | None = shutil.which("scanimage")
     if scanimage_executable is None:
