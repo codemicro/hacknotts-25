@@ -59,12 +59,23 @@ class PageState(enum.Enum):
     SENT = enum.auto()
 
 
-def get_page_state() -> list[tuple[int, bool]]:
+def get_page_state(starting_page_number: int) -> list[tuple[int, bool]]:
     fcont = json.loads(SCAN_STATE_FILE_PATH.read_text())
     highest_known = max(map(int, fcont["data"].keys()))
     res = []
-    for i in range(1, highest_known + 1):
-        res.append((i, PageState.SENT if i in fcont["sent"] else PageState.SEEN if str(i) in fcont["data"] else PageState.UNSEEN))
+    for i in range(starting_page_number, highest_known + 1):
+        res.append(
+            (
+                i,
+                (
+                    PageState.SENT
+                    if i in fcont["sent"]
+                    else PageState.SEEN
+                    if str(i) in fcont["data"]
+                    else PageState.UNSEEN
+                ),
+            )
+        )
     return res
 
 
@@ -75,7 +86,7 @@ def save_data_for_page(page_number: int, data: bytes) -> None:
         fcont = {"sent": [], "data": {}}
 
     fcont["data"][page_number] = base64.standard_b64encode(data).decode()
-    
+
     SCAN_STATE_FILE_PATH.write_text(json.dumps(fcont))
 
 
@@ -85,14 +96,14 @@ def mark_data_as_sent(page_number: int) -> None:
     SCAN_STATE_FILE_PATH.write_text(json.dumps(fcont))
 
 
-def send_lowest_contiguous_block() -> bytes | None:
+def send_lowest_contiguous_block(starting_page_number: int) -> bytes | None:
     fcont = json.loads(SCAN_STATE_FILE_PATH.read_text())
 
     if len(fcont["sent"]) == 0:
-        highest_sent = 0
+        highest_sent = starting_page_number - 1
     else:
         highest_sent = max(fcont["sent"])
-    
+
     highest_known = max(map(int, fcont["data"].keys()))
 
     to_send = []

@@ -2,17 +2,16 @@
 
 import io
 import os
-from pathlib import Path
 import shutil
-import string
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import platformdirs
-from pylibdmtx import pylibdmtx
 from PIL import Image
+from pylibdmtx import pylibdmtx
 
 from . import utils
 
@@ -37,7 +36,7 @@ def parse_scanned_payload(inp: bytes) -> tuple[int, bytes]:
     return int(inp[0]), inp[1:]
 
 
-def scan_and_send() -> None:
+def scan_and_send(starting_page_number: int) -> None:
     scanimage_executable: str | None = shutil.which("scanimage")
     if scanimage_executable is None:
         sys.stderr.write(
@@ -67,7 +66,7 @@ def scan_and_send() -> None:
 
     with open(f"tempscan.{int(time.time())}.{INTERMEDIARY_IMAGE_FORMAT}", "wb") as f:
         f.write(completed_scanimage_subprocess.stdout)
- 
+
     scanned_image: Image.Image = Image.open(
         io.BytesIO(completed_scanimage_subprocess.stdout), formats=(INTERMEDIARY_IMAGE_FORMAT,)
     )
@@ -81,8 +80,8 @@ def scan_and_send() -> None:
     utils.save_data_for_page(page_number, payload)
 
     print(f"[*] Got page {page_number}")
-    
-    bytes_to_send = utils.send_lowest_contiguous_block()
+
+    bytes_to_send = utils.send_lowest_contiguous_block(starting_page_number)
     if bytes_to_send is not None:
         with Path(os.environ.get("IPOPS_INBOUND_PATH", "/var/run/printun")).open("wb") as f:
             f.write(payload)
@@ -97,11 +96,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         return -1
 
     while True:
-        input("[?] Place a document on the scanner and press <ENTER>")
-        scan_and_send()
+        first_page_number: int = int(
+            input(
+                "[?] Place a document on the scanner, "
+                "type the starting page number of this batch and press <ENTER>"
+            )
+        )
+        scan_and_send(first_page_number)
         print("[!] Page state: ", end="")
 
-        for (i, state) in utils.get_page_state():
+        for i, state in utils.get_page_state(first_page_number):
             fmt_fn = str
 
             if state == utils.PageState.UNSEEN:
