@@ -79,8 +79,6 @@ def _run_print_loop(lp_executable: str, starting_page_number: int) -> int:
         ipops_frames_data, starting_page_number=starting_page_number
     )
 
-    logger.debug("Formatting PDF completed successfully")
-
     completed_print_subprocess_stdout: str = subprocess.run(
         (lp_executable,),
         check=True,

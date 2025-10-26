@@ -62,6 +62,8 @@ class _IPoPS_PDF(FPDF):
 
 def bytes_into_pdf(content: bytes, starting_page_number: int) -> tuple[bytearray, int]:
     """"""
+    logger.debug("Beginning PDF formatting")
+
     pdf: FPDF = _IPoPS_PDF(format="A4", starting_page_number=starting_page_number)
 
     match settings.PDF_DATA_FORMAT:
@@ -101,5 +103,7 @@ def bytes_into_pdf(content: bytes, starting_page_number: int) -> tuple[bytearray
                 f"Unrecognized PDF data format: {settings.PDF_DATA_FORMAT}"
             )
             raise ValueError(UNKNOWN_PDF_DATA_FORMAT_ERROR)
+
+    logger.debug("Formatting PDF completed successfully")
 
     return pdf.output(), pdf.pages_count
