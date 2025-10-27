@@ -60,6 +60,14 @@ class _IPoPS_PDF(FPDF):
         self.cell(0, 10, str(self.starting_page_number + self.page_no()), align="C")
 
 
+def resize(img):
+    base_width = 500
+    wpercent = (base_width / float(img.size[0]))
+    hsize = int((float(img.size[1]) * float(wpercent)))
+    return img.resize((base_width, hsize), Image.Resampling.NEAREST)
+    
+
+
 def bytes_into_pdf(content: bytes, starting_page_number: int) -> tuple[bytearray, int]:
     """"""
     logger.debug("Beginning PDF formatting")
@@ -89,12 +97,11 @@ def bytes_into_pdf(content: bytes, starting_page_number: int) -> tuple[bytearray
                     + base64.b85encode(bytes(content_chunk))
                 )
                 pdf.image(
-                    Image.frombytes(
+                    resize(Image.frombytes(
                         "RGB",
                         (encoded_datamatrix.width, encoded_datamatrix.height),
                         encoded_datamatrix.pixels,
-                    ),
-                    w=0 if encoded_datamatrix.width < 550 else 550,
+                    )),
                 )
                 page_index += 1
 
